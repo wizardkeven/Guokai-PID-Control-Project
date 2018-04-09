@@ -27,13 +27,25 @@ std::string hasData(std::string s) {
   }
   return "";
 }
-
+int counter = 0;
+double tol = 0.2;
 int main()
 {
   uWS::Hub h;
 
   PID pid;
   // TODO: Initialize the pid variable.
+//[2.9331227688652457, 10.326589894591526, 0.49316041639454505]
+  // double m_Kp = -0.5;
+  // double m_Ki = -0.004;
+  // double m_Kd = -0.5;
+  double p[3]{0.5, 0.0, 0.0}
+  double dp[3]{1,1,1};
+  pid.Init(p[0], p[1], p[2]);
+  double best_err = 0.0;
+  double m_error = 0;
+  int para_index = 0;
+  
 
   h.onMessage([&pid](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
@@ -53,13 +65,44 @@ int main()
           double steer_value;
           /*
           * TODO: Calcuate steering value here, remember the steering value is
-          * [-1, 1].
+          * [-1, 1]. 
           * NOTE: Feel free to play around with the throttle and speed. Maybe use
           * another PID controller to control the speed!
           */
-          
+          counter++;
+          if((dp[0]+dp[1]+dp[2] < tol)){ //abs(cte) > 6.0 || 
+              std::string msg = "42[\"reset\",{}]";
+              std::cout << msg << std::endl;
+              ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
+              counter = 0;
+          }
+          //calculating err from 100 iteration
+          if(counter > 100 && counter < 200){
+            // std::string msg = "42[\"reset\",{}]";
+            // std::cout << msg << std::endl;
+            // ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
+            m_error += cte*cte;
+          }
+
+          if(counter > 200){
+
+            best_err = m_error;
+            
+
+            p[para_index] += dp[para_index];
+            pid.Init(p[0], p[1], p[2]);
+
+            // steer_value = deg2rad(steer_value);
+            // while(steer_value > pi()) steer_value -= pi();
+            // while(steer_value < -pi()) steer_value += pi();
+            
+          }
+          //calculating steer
+          pid.UpdateError(cte);
+          steer_value = pid.TotalError();
           // DEBUG
           std::cout << "CTE: " << cte << " Steering Value: " << steer_value << std::endl;
+          std::cout << "P: "<<p[0]<<"\tI: "<<p[1]<<"\tD: "<<p[2]<<"\n";
 
           json msgJson;
           msgJson["steering_angle"] = steer_value;
