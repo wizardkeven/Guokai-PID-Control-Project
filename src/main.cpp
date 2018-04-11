@@ -27,10 +27,11 @@ std::string hasData(std::string s) {
   }
   return "";
 }
-double p[3]{0.380643, 0.0309032, 4.65811};
-double dp[3]{1,1,1};
+//P: 0.408472 I: 0.023168 D: 4.6654
+double p[3]{0.408472, 0.023168, 4.6654};
+double dp[3]{0.1,0.01,0.1};
 int counter = 0;
-double tol = 0.2;
+double tol = 0.05;
 bool isCalculateErr = false;
 bool isInit = false;
 double best_err = 0.0;
@@ -38,6 +39,8 @@ double m_error = 0;
 int para_index = 0;
 //current parameter index
 int current_index = 0;
+
+bool trained = true;//train flag: true -> tuning completed, false -> tuning mode
 //current twiddle step: 1; 2; 3
 enum Step{STEP_1, STEP_2};
 Step phase = STEP_1;
@@ -80,166 +83,171 @@ int main()
           * NOTE: Feel free to play around with the throttle and speed. Maybe use
           * another PID controller to control the speed!
           */
-          // counter++;
-          // if(!isInit)
-          // {
-          //   if(counter > 100 && counter < 200)
-          //   {
-          //     // std::string msg = "42[\"reset\",{}]";
-          //     // std::cout << msg << std::endl;
-          //     // ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
-          //     m_error += cte*cte;
-          //   }
-          //   if(counter >= 200){
-          //     //get init best_err
-          //     best_err = m_error;
-          //     //initialization completed
-          //     isInit = true;
-          //     //reset counter for twiddle
-          //     counter = 0;
-          //     std::cout<<"initialization completed with error: "<<best_err<<"\n";
-          //     //reset simulater
-          //     std::string msg = "42[\"reset\",{}]";
-          //     std::cout << msg << "\n";
-          //     std::cout <<"Update PID: get error < "<<best_err<<"\nP: "<<p[0]<<"\tI: "<<p[1]<<"\tD: "<<p[2]<<std::endl;
-          //     ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
-          //   }
-          // }else
-          // {
-          //   // std::cout<<"start twiddling \n";
-          //   //if cannot improve performance restart 
-          //   if((dp[0]+dp[1]+dp[2] < tol))
-          //   { //abs(cte) > 6.0 || 
-          //     std::string msg = "42[\"restart\",{}]";
-          //     std::cout << msg << "\n";
-          //     std::cout <<"Get error < "<<best_err<<"\nP: "<<p[0]<<"\tI: "<<p[1]<<"\tD: "<<p[2]<<std::endl;
-          //     ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
-          //     counter = 0;
-          //   }else{
+          counter++;
+          if(!trained)
+          {
+          if(!isInit)
+          {
+            if(counter > 100 && counter < 200)
+            {
+              // std::string msg = "42[\"reset\",{}]";
+              // std::cout << msg << std::endl;
+              // ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
+              m_error += cte*cte;
+            }
+            if(counter >= 200){
+              //get init best_err
+              best_err = m_error;
+              //initialization completed
+              isInit = true;
+              //reset counter for twiddle
+              counter = 0;
+              std::cout<<"initialization completed with error: "<<best_err<<"\n";
+              //reset simulater
+              std::string msg = "42[\"reset\",{}]";
+              std::cout << msg << "\n";
+              std::cout <<"Update PID: get error < "<<best_err<<"\nP: "<<p[0]<<"\tI: "<<p[1]<<"\tD: "<<p[2]<<std::endl;
+              ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
+            }
+          }else
+          {
+            // std::cout<<"start twiddling \n";
+            //if cannot improve performance restart 
+            if((dp[0]+dp[1]+dp[2] < tol))
+            { //abs(cte) > 6.0 || 
+              std::string msg = "42[\"reset\",{}]";
+              std::cout << msg << "\n";
+              std::cout <<"Finish tuning parameters with error --> "<<best_err<<"\nP: "<<p[0]<<"\tI: "<<p[1]<<"\tD: "<<p[2]<<std::endl;
+              ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
+              counter = 0;
+              trained = true;
+            }else{
 
-          //     switch(phase)
-          //     {
-          //       case STEP_1: if(!isCalculateErr)
-          //                     {//try twiddle para_index-th parameter
-          //                       std::cout<<"Step 1!\n";
-          //                       current_index = para_index ;
-          //                       //update parameter index for next update
-          //                       para_index = (para_index+1)%3;
-          //                       //twiddle coefficient
-          //                       p[current_index] += dp[current_index];
-          //                       //update coefficients of pid controller
-          //                       // pid.Kp = p[0];
-          //                       // pid.Ki = p[1];
-          //                       // pid.Kd = p[2];
-          //                       pid.Init(p[0], p[1], p[2]);
-          //                       isCalculateErr = true;
-          //                       m_error = 0;
-          //                     }else{
-          //                       // std::cout<<"Step 1: calculating errors!\n";
-          //                       //calculating err from 100 iteration
-          //                       if( counter > 100 && counter < 200)
-          //                       {
-          //                         m_error += cte*cte;
-          //                       }
-          //                       if(counter >= 200)
-          //                       {
-          //                         counter = 0;
-          //                         isCalculateErr = false;
-          //                         //if got better error update best_err
-          //                         if( m_error < best_err )
-          //                         {
-          //                           best_err = m_error;
-          //                           dp[current_index]*=1.1;
-          //                           current_index = para_index;
+              switch(phase)
+              {
+                case STEP_1: if(!isCalculateErr)
+                              {//try twiddle para_index-th parameter
+                                std::cout<<"Step 1!\n";
+                                current_index = para_index ;
+                                //update parameter index for next update
+                                para_index = (para_index+1)%3;
+                                //twiddle coefficient
+                                p[current_index] += dp[current_index];
+                                //update coefficients of pid controller
+                                // pid.Kp = p[0];
+                                // pid.Ki = p[1];
+                                // pid.Kd = p[2];
+                                pid.Init(p[0], p[1], p[2]);
+                                isCalculateErr = true;
+                                m_error = 0;
+                              }else{
+                                // std::cout<<"Step 1: calculating errors!\n";
+                                //calculating err from 100 iteration
+                                if( counter > 100 && counter < 200)
+                                {
+                                  m_error += cte*cte;
+                                }
+                                if(counter >= 200)
+                                {
+                                  counter = 0;
+                                  isCalculateErr = false;
+                                  //if got better error update best_err
+                                  if( m_error < best_err )
+                                  {
+                                    best_err = m_error;
+                                    dp[current_index]*=1.1;
+                                    current_index = para_index;
                                 
-          //                         }else{
-          //                           phase = STEP_2;
-          //                         }
+                                  }else{
+                                    phase = STEP_2;
+                                  }
 
-          //                         //reset simulater
-          //                         std::string msg = "42[\"reset\",{}]";
-          //                         // std::cout << msg << "\n";
-          //                         std::cout <<"Step 1: update PID: get error < "<<best_err<<"\nP: "<<p[0]<<"\tI: "<<p[1]<<"\tD: "<<p[2]<<std::endl;
-          //                         ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
+                                  //reset simulater
+                                  std::string msg = "42[\"reset\",{}]";
+                                  // std::cout << msg << "\n";
+                                  std::cout <<"Step 1: update PID: get error < "<<best_err<<"\nP: "<<p[0]<<"\tI: "<<p[1]<<"\tD: "<<p[2]<<std::endl;
+                                  ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
 
-          //                       }
-          //                     }
+                                }
+                              }
                               
-          //                     break;
+                              break;
 
-          //       case STEP_2: if(!isCalculateErr)
-          //                     {
-          //                       std::cout<<"Step 2!\n";
-          //                       p[current_index] -= 2*dp[current_index];
-          //                       //update coefficients of pid controller
-          //                       // pid.Kp = p[0];
-          //                       // pid.Ki = p[1];
-          //                       // pid.Kd = p[2];
-          //                       pid.Init(p[0], p[1], p[2]);
-          //                       isCalculateErr = true;
-          //                       m_error = 0;
-          //                     }else{
-          //                       //calculating err from 100 iteration
-          //                       if( counter > 100 && counter < 200)
-          //                       {
-          //                         m_error += cte*cte;
-          //                       }
-          //                       if(counter >= 200)
-          //                       {
-          //                         counter = 0;
-          //                         isCalculateErr = false;
-          //                         //if got better error update best_err
-          //                         if( m_error < best_err )
-          //                         {
-          //                           best_err = m_error;
-          //                           dp[current_index]*=1.1;
+                case STEP_2: if(!isCalculateErr)
+                              {
+                                std::cout<<"Step 2!\n";
+                                p[current_index] -= 2*dp[current_index];
+                                //update coefficients of pid controller
+                                // pid.Kp = p[0];
+                                // pid.Ki = p[1];
+                                // pid.Kd = p[2];
+                                pid.Init(p[0], p[1], p[2]);
+                                isCalculateErr = true;
+                                m_error = 0;
+                              }else{
+                                //calculating err from 100 iteration
+                                if( counter > 100 && counter < 200)
+                                {
+                                  m_error += cte*cte;
+                                }
+                                if(counter >= 200)
+                                {
+                                  counter = 0;
+                                  isCalculateErr = false;
+                                  //if got better error update best_err
+                                  if( m_error < best_err )
+                                  {
+                                    best_err = m_error;
+                                    dp[current_index]*=1.1;
                                     
-          //                         }else{
-          //                           p[current_index] += dp[current_index];
-          //                           dp[current_index] *= 0.9;
+                                  }else{
+                                    p[current_index] += dp[current_index];
+                                    dp[current_index] *= 0.9;
 
-          //                         }
-          //                         //move to next parameter
-          //                         current_index = para_index;
-          //                         //restart from step 1
-          //                         phase = STEP_1;
-          //                         //reset simulater
-          //                         std::string msg = "42[\"reset\",{}]";
-          //                         // std::cout << msg << "\n";
-          //                         std::cout <<"Step 2: update PID: get error < "<<best_err<<"\nP: "<<p[0]<<"\tI: "<<p[1]<<"\tD: "<<p[2]<<std::endl;
-          //                         ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
+                                  }
+                                  //move to next parameter
+                                  current_index = para_index;
+                                  //restart from step 1
+                                  phase = STEP_1;
+                                  //reset simulater
+                                  std::string msg = "42[\"reset\",{}]";
+                                  // std::cout << msg << "\n";
+                                  std::cout <<"Step 2: update PID: get error < "<<best_err<<"\nP: "<<p[0]<<"\tI: "<<p[1]<<"\tD: "<<p[2]<<std::endl;
+                                  ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
 
-          //                       }
-          //                     }
+                                }
+                              }
                               
-          //                     break;
-          //       default: std:: cout<<"error in twiddle steps!"<<std::endl;
-          //     }
+                              break;
+                default: std:: cout<<"error in twiddle steps!"<<std::endl;
+              }
 
-          //       //debug
-          //       switch(current_index)
-          //       {
-          //         case 0: 
-          //                 std::cout << "Twiddle PID --> P: "<<p[0]<<"\n";
-          //                 break;
-          //         case 1: 
-          //                 std::cout << "Twiddle PID --> I: "<<p[1]<<"\n";
-          //                 break;
-          //         case 2: 
-          //                 std::cout << "Twiddle PID --> D: "<<p[2]<<"\n";
-          //                 break;
-          //         default: 
-          //                 std::cout << "Twiddle PID error index -->: "<<current_index<<"\n";
-          //                 break;
-          //       }           
+                //debug
+                switch(current_index)
+                {
+                  case 0: 
+                          std::cout << "Twiddle PID --> P: "<<p[0]<<"\t dp[0]: "<<dp[0]<<"\n";
+                          break;
+                  case 1: 
+                          std::cout << "Twiddle PID --> I: "<<p[1]<<"\t dp[1]: "<<dp[1]<<"\n";
+                          break;
+                  case 2: 
+                          std::cout << "Twiddle PID --> D: "<<p[2]<<"\t dp[2]: "<<dp[2]<<"\n";
+                          break;
+                  default: 
+                          std::cout << "Twiddle PID error index -->: "<<current_index<<"\n";
+                          break;
+                }           
 
-          //   }
-          // }
+            }
+          }
+        }
           //calculating steer
           pid.UpdateError(cte);
-          steer_value = -pid.TotalError();
+          steer_value = pid.TotalError();
           // DEBUG
-          std::cout << "CTE: " << cte << " Steering Value: " << steer_value << std::endl;
+          if(trained)
+            std::cout << "CTE: " << cte << " Steering Value: " << steer_value << std::endl;
 
           json msgJson;
           msgJson["steering_angle"] = steer_value;
